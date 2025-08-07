@@ -1,0 +1,17 @@
+[package]
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+name = "treasury"
+repository.workspace = true
+version = "0.1.0"
+
+[features]
+default = ["std"]
+std = ["codec/std", "frame/std", "scale-info/std"]
+
+[dependencies]
+codec = {features = ["derive"], workspace = true}
+frame = {features = ["experimental", "runtime"], workspace = true}
+scale-info = {features = ["derive"], workspace = true}
