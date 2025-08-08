@@ -24,7 +24,7 @@ pub mod pallet {
 
 	pub type ProposalId = u32;
 
-	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen,DecodeWithMemTracking)]
 	pub enum ProposalStatus {
 		Active,
 		Approved,	
@@ -105,7 +105,11 @@ pub mod pallet {
 			voter: T::AccountId,
 			vote: VoteKind,
     	},
-	}
+		ProposalFinalized {
+			id: ProposalId,
+			status: ProposalStatus,
+		},
+	}	
 
 	#[pallet::error]
 	pub enum Error<T> {
@@ -207,6 +211,40 @@ pub mod pallet {
 			});
 
 			Ok(())
+		}
+
+		#[pallet::call_index(2)]
+		#[pallet::weight(10_000)]
+		pub fn finalize_proposal(
+			origin: OriginFor<T>,
+			proposal_id: ProposalId,
+		) -> DispatchResult {
+			let _who = ensure_signed(origin)?;
+
+			Proposals::<T>::try_mutate(proposal_id, |maybe_proposal| -> Result<(), Error<T>> {
+				let proposal = maybe_proposal.as_mut().ok_or(Error::<T>::ProposalNotFound)?;
+
+				ensure!(proposal.status == ProposalStatus::Active, Error::<T>::ProposalNotActive);
+
+				let now: BlockNumberFor<T> = <frame_system::Pallet<T>>::block_number();
+				ensure!(now > proposal.end, Error::<T>::VotingPeriodEnded);
+
+				if proposal.for_votes > proposal.against_votes {
+					proposal.status = ProposalStatus::Approved;
+				} else {
+					proposal.status = ProposalStatus::Rejected;
+				}
+
+				Self::deposit_event(Event::<T>::ProposalFinalized {
+					id: proposal_id,
+					status: proposal.status.clone(),
+				});
+
+				Ok(())
+			})?;
+
+			Ok(())
+
 		}
 	}
 }
