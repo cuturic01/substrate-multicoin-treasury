@@ -158,13 +158,6 @@ export default function Profile({ address }: ProfileProps) {
                 return;
               }
 
-              // VaultSeeded(coin, amount) – global
-              if (evs?.template?.VaultSeeded?.is?.(ev)) {
-                const [coin, amount] = ev.data as unknown as [any, any];
-                out.push({ block: b, kind: "VaultSeeded", details: `${coin.toString()} +${formatBal(amount)}` });
-                return;
-              }
-
               // Fallback ako se ime palete razlikuje (npr. "templateModule")
               // if ((ev.section === "template" || ev.section === "templateModule") && ev.method === "Deposited") { ... }
             });
