@@ -115,6 +115,7 @@ import {
 				<ListItem
 				  button
 				  key={item.label}
+				  // @ts-ignore
 				  onClick={(e) => {
 					e.stopPropagation();
 					setDrawerOpen(false);
