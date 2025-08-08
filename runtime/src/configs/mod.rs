@@ -32,6 +32,7 @@ use frame_support::{
 		IdentityFee, Weight,
 	},
 };
+use frame_system::pallet_prelude::BlockNumberFor; // (može zatrebati u drugim delovima)
 use frame_system::limits::{BlockLength, BlockWeights};
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter, Multiplier};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
@@ -157,8 +158,19 @@ impl pallet_sudo::Config for Runtime {
 	type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
 }
 
-/// Configure the pallet-template in pallets/template.
+parameter_types! {
+    pub const MaxTitleLen: u32 = 64;
+    pub const MaxDescriptionLen: u32 = 1024;
+
+    pub const MinProposalDuration: u32 = 10;
+    pub const MaxProposalDuration: u32 = 10_000;
+}
+
 impl pallet_template::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_template::weights::SubstrateWeight<Runtime>;
+    type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = (); 
+    type MaxTitleLen = MaxTitleLen;
+    type MaxDescriptionLen = MaxDescriptionLen;
+    type MinProposalDuration = MinProposalDuration;
+    type MaxProposalDuration = MaxProposalDuration;
 }

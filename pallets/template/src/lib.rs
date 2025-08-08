@@ -18,6 +18,43 @@ pub mod pallet {
 	use super::*;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
+	use frame_support::{BoundedVec, pallet_prelude::*};
+	use frame_system::pallet_prelude::*;
+	use frame_system::pallet_prelude::BlockNumberFor;
+
+	pub type ProposalId = u32;
+
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	pub enum ProposalStatus {
+		Active,
+		Approved,	
+		Rejected,
+		Cancelled,
+	}
+
+	#[derive(Encode, Decode, Clone, Copy, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	pub enum VoteKind {
+		For,
+		Against,
+	}
+
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	#[scale_info(skip_type_params(T))]
+	#[codec(mel_bound())]
+	pub struct Proposal<T:Config>
+	where
+		T::AccountId: MaxEncodedLen,
+	{
+		pub id: ProposalId,
+		pub author: T::AccountId,
+		pub title: BoundedVec<u8, T::MaxTitleLen>,         
+		pub description: BoundedVec<u8, T::MaxDescriptionLen>, 
+		pub start: BlockNumberFor<T>,
+		pub end: BlockNumberFor<T>,                        
+		pub for_votes: u32,
+		pub against_votes: u32,
+		pub status: ProposalStatus,
+	}
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -26,6 +63,10 @@ pub mod pallet {
 	pub trait Config: frame_system::Config {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		type WeightInfo: WeightInfo;
+		type MaxTitleLen: Get<u32>;
+		type MaxDescriptionLen: Get<u32>;
+		type MinProposalDuration: Get<u32>;
+		type MaxProposalDuration: Get<u32>;
 	}
 
 	#[pallet::storage]
