@@ -168,6 +168,8 @@ parameter_types! {
 	pub const DaoQuorum: Permill = Permill::from_parts(666_666_666); // ~2/3
     pub const DaoApprovalOfQuorum: Permill = Permill::from_percent(50); // 1/2
 
+	pub const KarmaUnit: Balance = 1_000_000; // adjust to your decimals
+
 }
 
 impl pallet_template::Config for Runtime {
@@ -182,4 +184,6 @@ impl pallet_template::Config for Runtime {
 	type Currency = Balances;
     type Quorum = DaoQuorum;
     type ApprovalOfQuorum = DaoApprovalOfQuorum;
+
+	type KarmaUnit = KarmaUnit;
 }

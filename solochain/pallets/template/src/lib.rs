@@ -79,6 +79,8 @@ pub mod pallet {
 
 		type Quorum: Get<Permill>;
 		type ApprovalOfQuorum: Get<Permill>;
+
+		type KarmaUnit: Get<BalanceOf<Self>>;
 	}
 
 	#[pallet::storage]
@@ -112,6 +114,11 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn total_stake)]
 	pub type TotalStake<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn karma)]
+	pub type Karma<T: Config> =
+    	StorageMap<_, Blake2_128Concat, T::AccountId, u32, ValueQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -222,7 +229,12 @@ pub mod pallet {
 					Error::<T>::AlreadyVoted
 				);
 
-				let weight = Deposits::<T>::get(&who);
+				let stake = Deposits::<T>::get(&who);
+				let karma_pts: u32 = Karma::<T>::get(&who);
+				let karma_weight: BalanceOf<T> =
+					T::KarmaUnit::get().saturating_mul(BalanceOf::<T>::from(karma_pts));
+
+				let weight = stake.saturating_add(karma_weight);
 				ensure!(!weight.is_zero(), Error::<T>::NoDeposit);
 
 				match vote {
@@ -274,6 +286,10 @@ pub mod pallet {
 				let needed_for = T::ApprovalOfQuorum::get().mul_floor(participation);
 
 				proposal.status = if proposal.for_votes >= needed_for {
+					proposal.status = ProposalStatus::Approved;
+
+					let author = proposal.author.clone();
+					Karma::<T>::mutate(&author, |k| *k = k.saturating_add(1));
 					ProposalStatus::Approved
 				} else {
 					ProposalStatus::Rejected
