@@ -131,7 +131,7 @@ export default function ProposalList() {
                   color="text.secondary"
                   sx={{ display: "flex", alignItems: "center", mt: 1 }}
                 >
-                  Creator:&nbsp;
+                  Author:&nbsp;
                   <span style={{ fontFamily: "monospace" }}>
                     {ellipsisAddress(p.author, 20)}
                   </span>
@@ -146,10 +146,10 @@ export default function ProposalList() {
                 </Typography>
 
                 <Typography variant="body2" color="text.secondary">
-                  Votes For: {p.votes_for} | Votes Against: {p.votes_against}
+                  Votes For: <span style={{ color: '#FF4AA6' }}>{p.votes_for}</span> | Votes Against: <span style={{ color: '#FF4AA6' }}>{p.votes_against}</span>
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Duration (in blocks): {p.duration}
+                  Duration (in blocks): <span style={{ color: '#FF4AA6' }}>{p.duration}</span>
                 </Typography>
                 <Typography variant="body2" color="#FF4AA6" sx={{ mt: 1 }}>
                   Status: {p.status}
