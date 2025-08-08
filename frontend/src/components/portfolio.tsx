@@ -1,6 +1,6 @@
 // src/pages/Portfolio.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, Paper, Stack, Typography, Chip } from "@mui/material";
+import { Box, Paper, Stack, Typography, Chip, Grid } from "@mui/material";
 import { ApiPromise, WsProvider } from "@polkadot/api";
 import { web3Enable } from "@polkadot/extension-dapp";
 import toast from "react-hot-toast";
@@ -111,26 +111,7 @@ export default function Portfolio() {
     [slices]
   );
 
-  const CenterMetric: PieSvgProps<any>["layers"][number] = ({ centerX, centerY }) => (
-    <g transform={`translate(${centerX}, ${centerY})`}>
-      <text
-        textAnchor="middle"
-        dominantBaseline="central"
-        y={-6}
-        style={{ fontSize: 12, fill: "#E5E7EB" }} // sivo-belo za labelu
-      >
-        Total
-      </text>
-      <text
-        textAnchor="middle"
-        dominantBaseline="central"
-        y={14}
-        style={{ fontSize: 16, fontWeight: 600, fill: "#FFFFFF" }} // belo za broj
-      >
-        {fmtNum(total)}
-      </text>
-    </g>
-  );
+  // Removed CenterMetric layer to remove total inside chart
 
   return (
     <Box
@@ -139,7 +120,7 @@ export default function Portfolio() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        pt: 1, // smanjen margin top
+        pt: 1,
         px: 2,
       }}
     >
@@ -152,12 +133,10 @@ export default function Portfolio() {
         }}
       >
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
-          <Typography variant="h5" color="secondary">Portfolio</Typography>
-          <Chip
-            label={loading ? "Loading..." : `Total: ${fmtNum(total)}`}
-            variant="outlined"
-            size="small"
-          />
+          <Typography variant="h5" color="secondary">
+            Portfolio
+          </Typography>
+          <Chip label={loading ? "Loading..." : ""} variant="outlined" size="small" />
         </Stack>
 
         {loading ? (
@@ -165,49 +144,73 @@ export default function Portfolio() {
         ) : nivoData.length === 0 ? (
           <Typography sx={{ textAlign: "center", py: 6 }}>No assets in vault yet.</Typography>
         ) : (
-          <Box sx={{ height: 280 }}>
-            <ResponsivePie
-              data={nivoData}
-              innerRadius={0.7}
-              padAngle={2}
-              cornerRadius={6}
-              activeOuterRadiusOffset={8}
-              colors={{ datum: "data.color" }}
-              enableArcLabels={false}
-              enableArcLinkLabels={false}
-              arcBorderWidth={1}
-              arcBorderColor={{ from: "color", modifiers: [["darker", 0.4]] }}
-              startAngle={90}
-              endAngle={-270}
-              sortByValue={true}
-              motionConfig="stiff"
-              tooltip={({ datum }) => (
-                <Box sx={{ px: 1, py: 0.5 }}>
-                  <Typography variant="body2">
-                    {datum.id as string}: {fmtNum(datum.value as number)}
-                    {typeof (datum.data as any).pct === "number"
-                      ? ` (${pf.format((datum.data as any).pct)})`
-                      : ""}
-                  </Typography>
-                </Box>
-              )}
-              legends={[
-                {
-                  anchor: "bottom",
-                  direction: "row",
-                  justify: false,
-                  translateY: 24,
-                  itemWidth: 90,
-                  itemHeight: 16,
-                  itemsSpacing: 8,
-                  symbolSize: 12,
-                  symbolShape: "square",
-                  itemTextColor: "#111827",
-                },
-              ]}
-              layers={["arcs", "arcLabels", "legends", CenterMetric]}
-            />
-          </Box>
+          <>
+            <Box sx={{ height: 280 }}>
+              <ResponsivePie
+                data={nivoData}
+                innerRadius={0.7}
+                padAngle={2}
+                cornerRadius={6}
+                activeOuterRadiusOffset={8}
+                colors={{ datum: "data.color" }}
+                enableArcLabels={false}
+                enableArcLinkLabels={false}
+                arcBorderWidth={1}
+                arcBorderColor={{ from: "color", modifiers: [["darker", 0.4]] }}
+                startAngle={90}
+                endAngle={-270}
+                sortByValue={true}
+                motionConfig="stiff"
+                tooltip={({ datum }) => (
+                  <Box sx={{ px: 1, py: 0.5 }}>
+                    <Typography variant="body2">
+                      {datum.id as string}: {fmtNum(datum.value as number)}
+                      {typeof (datum.data as any).pct === "number"
+                        ? ` (${pf.format((datum.data as any).pct)})`
+                        : ""}
+                    </Typography>
+                  </Box>
+                )}
+                legends={[]} // Remove internal legends, we create a separate legend
+              />
+            </Box>
+
+            {/* New separate legend container */}
+            <Box sx={{ mt: 2, px: 1 }}>
+              <Typography variant="subtitle1" gutterBottom>
+                Breakdown by Token (%)
+              </Typography>
+              <Grid container spacing={1}>
+                {slices.map(({ name, color, pct }) => (
+                  <Grid
+                    item
+                    key={name}
+                    xs={6}
+                    sm={4}
+                    sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                  >
+                    <Box
+                      sx={{
+                        width: 14,
+                        height: 14,
+                        bgcolor: color,
+                        borderRadius: 0.5,
+                      }}
+                    />
+                    <Typography variant="body2" sx={{ flexGrow: 1 }}>
+                      {name}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: "bold", minWidth: 40, textAlign: "right" }}
+                    >
+                      {pct !== undefined ? pf.format(pct) : "-"}
+                    </Typography>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          </>
         )}
       </Paper>
     </Box>
