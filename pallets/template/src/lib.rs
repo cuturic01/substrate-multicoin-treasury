@@ -19,8 +19,8 @@ pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 	use frame_support::{BoundedVec, pallet_prelude::*};
-	use frame_system::pallet_prelude::*;
 	use frame_system::pallet_prelude::BlockNumberFor;
+	use frame_support::sp_runtime::Saturating;
 
 	pub type ProposalId = u32;
 
@@ -70,49 +70,84 @@ pub mod pallet {
 	}
 
 	#[pallet::storage]
-	pub type Something<T> = StorageValue<_, u32>;
+	#[pallet::getter(fn proposals)]
+	pub type Proposals<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,    // hasher za ključ
+		ProposalId,          // tip ključa
+		Proposal<T>,         // tip vrednosti (struct Proposal<T>)
+		OptionQuery          // vrednost se vraća kao Option<Proposal<T>>
+	>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn next_proposal_id)]
+	pub type NextProposalId<T> = StorageValue<_, ProposalId, ValueQuery>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		SomethingStored {
-			something: u32,
-			who: T::AccountId,
-		},
+		ProposalCreated {
+			id: ProposalId,
+			author: T::AccountId,
+    	},
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
 		NoneValue,
 		StorageOverflow,
+		DurationTooShort,
+    	DurationTooLong,
 	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {		
+		
 		#[pallet::call_index(0)]
-		#[pallet::weight(T::WeightInfo::do_something())]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
+		#[pallet::weight(10_000)]
+		pub fn create_proposal(
+			origin: OriginFor<T>,
+			title: BoundedVec<u8, T::MaxTitleLen>,
+			description: BoundedVec<u8, T::MaxDescriptionLen>,
+			duration: u32,
+		) -> DispatchResult {
+
 			let who = ensure_signed(origin)?;
 
-			Something::<T>::put(something);
+			ensure!(duration >= T::MinProposalDuration::get(), Error::<T>::DurationTooShort);
+			ensure!(duration <= T::MaxProposalDuration::get(), Error::<T>::DurationTooLong);
 
-			Self::deposit_event(Event::SomethingStored { something, who });
+			let title_b: BoundedVec<_, T::MaxTitleLen> =
+				title.try_into().map_err(|_| Error::<T>::StorageOverflow)?;
+			let desc_b: BoundedVec<_, T::MaxDescriptionLen> =
+				description.try_into().map_err(|_| Error::<T>::StorageOverflow)?;
+
+			let id = NextProposalId::<T>::get();
+			let now: BlockNumberFor<T> = <frame_system::Pallet<T>>::block_number();
+			let duration_bn: BlockNumberFor<T> = duration.into();
+			let end = now.saturating_add(duration_bn);
+
+			// Napravi strukturu direktno
+			let proposal = Proposal::<T> {
+				id,
+				author: who.clone(),
+				title: title_b,
+				description: desc_b,
+				start: now,
+				end,
+				for_votes: 0,
+				against_votes: 0,
+				status: ProposalStatus::Active,
+			};
+
+			Proposals::<T>::insert(id, proposal);
+			NextProposalId::<T>::put(id.checked_add(1).ok_or(Error::<T>::StorageOverflow)?);
+
+			Self::deposit_event(Event::<T>::ProposalCreated { id, author: who });
 
 			Ok(())
 		}
 
-		#[pallet::call_index(1)]
-		#[pallet::weight(T::WeightInfo::cause_error())]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
 
-			match Something::<T>::get() {
-				None => Err(Error::<T>::NoneValue.into()),
-				Some(old) => {
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					Something::<T>::put(new);
-					Ok(())
-				},
-			}
-		}
 	}
 }
