@@ -107,6 +107,7 @@ export default function ProposalList() {
       ) : (
         <Grid container spacing={2}>
           {proposals.map((p) => (
+            //@ts-ignore
             <Grid item xs={12} sm={6} md={4} key={p.id} sx={{ width: 350 }}>
               <Paper
                 sx={{
