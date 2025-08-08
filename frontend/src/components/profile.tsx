@@ -1,16 +1,17 @@
 // src/pages/Profile.tsx
 import { useEffect, useMemo, useState } from "react";
 import {
-  Box, Paper, Stack, Typography, Button, Table, TableHead, TableRow, TableCell,
+  Box, Paper, Stack, Typography, Table, TableHead, TableRow, TableCell,
   TableBody, TablePagination, Chip, Divider, Tooltip, IconButton
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { ApiPromise, WsProvider } from "@polkadot/api";
 import { web3Accounts, web3Enable } from "@polkadot/extension-dapp";
 import toast from "react-hot-toast";
+import { decodeAddress } from "@polkadot/util-crypto";
+import { u8aEq } from "@polkadot/util";
 
 const WS_URL = "ws://127.0.0.1:9944";
-const BLOCK_WINDOW = 5000; // koliko blokova unazad skeniramo (po potrebi smanji/povećaj)
 
 type TxRow = {
   block: number;
@@ -19,8 +20,31 @@ type TxRow = {
 };
 
 type ProfileProps = {
-  address?: string; // opcionalno, ako želiš da proslediš adresu spolja
+  address?: string;
 };
+
+// ---- helpers ----
+function sameAccount(a?: string | Uint8Array | null, b?: string | Uint8Array | null) {
+  if (!a || !b) return false;
+  try {
+    const da = typeof a === "string" ? decodeAddress(a) : a;
+    const db = typeof b === "string" ? decodeAddress(b) : b;
+    return u8aEq(da, db);
+  } catch {
+    return String(a) === String(b);
+  }
+}
+
+function formatBal(x: any) {
+  try { return x.toString(); } catch { return String(x); }
+}
+
+function voteToString(v: any) {
+  const j = v?.toJSON?.() ?? v;
+  if (typeof j === "string") return j;
+  if (j && typeof j === "object") return Object.keys(j)[0] ?? String(v);
+  return String(v);
+}
 
 export default function Profile({ address }: ProfileProps) {
   const [api, setApi] = useState<ApiPromise | null>(null);
@@ -61,7 +85,7 @@ export default function Profile({ address }: ProfileProps) {
         if (!mounted) return;
         setApi(_api);
 
-        // 1) Učitaj stake/karma/total
+        // 1) Profil info
         if (account) {
           const st = await _api.query.template.deposits(account);
           setStake(st.toString());
@@ -71,71 +95,86 @@ export default function Profile({ address }: ProfileProps) {
         const ts = await _api.query.template.totalStake();
         setTotalStake(ts.toString());
 
-        // 2) Učitaj evente u poslednjih BLOCK_WINDOW blokova
+        // 2) Transakcije/eventi – dinamički window po blockHashCount
         const head = await _api.rpc.chain.getHeader();
         const current = head.number.toNumber();
-        const from = Math.max(1, current - BLOCK_WINDOW + 1);
+
+        // koliki opseg čvor garantuje u memoriji
+        const maxHashes = _api.consts.system?.blockHashCount?.toNumber?.() ?? 256;
+        // idi manje od blockHashCount; i ograniči na npr. 2000
+        const WINDOW = Math.min(2000, Math.max(1, maxHashes - 2));
+        const from = Math.max(1, current - WINDOW + 1);
 
         const out: TxRow[] = [];
         for (let b = current; b >= from; b--) {
           const hash = await _api.rpc.chain.getBlockHash(b);
-          const events = await _api.query.system.events.at(hash);
-          //@ts-ignore
-          events.forEach((record: any) => {
-            const { event } = record;
-            const section = event.section as string;  // očekujemo "template"
-            const method = event.method as string;
+          try {
+            const events = await _api.query.system.events.at(hash);
+            const evs = (_api.events as any) ?? {};
 
-            if (section !== "template") return;
+            events.forEach((record: any) => {
+              const ev = record.event;
 
-            // Mapiramo tvoje evente iz paleta
-            // Event::Deposited { who, amount }
-            if (method === "Deposited") {
-              const [who, amount] = event.data as unknown as [string, any];
-              if (who === account) {
-                out.push({ block: b, kind: "Deposited", details: `+ ${amount.toString()}` });
+              // Deposited(who, amount)
+              if (evs?.template?.Deposited?.is?.(ev)) {
+                const [who, amount] = ev.data as unknown as [any, any];
+                if (sameAccount(who?.toString?.(), account)) {
+                  out.push({ block: b, kind: "Deposited", details: `+ ${formatBal(amount)}` });
+                }
+                return;
               }
-            }
 
-            // Event::Withdrawn { who, amount }
-            if (method === "Withdrawn") {
-              const [who, amount] = event.data as unknown as [string, any];
-              if (who === account) {
-                out.push({ block: b, kind: "Withdrawn", details: `- ${amount.toString()}` });
+              // Withdrawn(who, amount)
+              if (evs?.template?.Withdrawn?.is?.(ev)) {
+                const [who, amount] = ev.data as unknown as [any, any];
+                if (sameAccount(who?.toString?.(), account)) {
+                  out.push({ block: b, kind: "Withdrawn", details: `- ${formatBal(amount)}` });
+                }
+                return;
               }
-            }
 
-            // Event::ProposalCreated { id, author }
-            if (method === "ProposalCreated") {
-              const [id, author] = event.data as unknown as [number, string];
-              if (author === account) {
-                out.push({ block: b, kind: "ProposalCreated", details: `Proposal #${id}` });
+              // ProposalCreated(id, author)
+              if (evs?.template?.ProposalCreated?.is?.(ev)) {
+                const [id, author] = ev.data as unknown as [any, any];
+                if (sameAccount(author?.toString?.(), account)) {
+                  out.push({ block: b, kind: "ProposalCreated", details: `Proposal #${id.toString()}` });
+                }
+                return;
               }
-            }
 
-            // Event::ProposalVoted { id, voter, vote }
-            if (method === "ProposalVoted") {
-              const [id, voter, vote] = event.data as unknown as [number, string, any];
-              if (voter === account) {
-                out.push({ block: b, kind: "ProposalVoted", details: `#${id} → ${vote.toString()}` });
+              // ProposalVoted(id, voter, vote)
+              if (evs?.template?.ProposalVoted?.is?.(ev)) {
+                const [id, voter, vote] = ev.data as unknown as [any, any, any];
+                if (sameAccount(voter?.toString?.(), account)) {
+                  out.push({ block: b, kind: "ProposalVoted", details: `#${id.toString()} → ${voteToString(vote)}` });
+                }
+                return;
               }
-            }
 
-            // Event::ProposalFinalized { id, status }
-            if (method === "ProposalFinalized") {
-              const [id, status] = event.data as unknown as [number, any];
-              out.push({ block: b, kind: "ProposalFinalized", details: `#${id} → ${status.toString()}` });
-            }
+              // ProposalFinalized(id, status) – global
+              if (evs?.template?.ProposalFinalized?.is?.(ev)) {
+                const [id, status] = ev.data as unknown as [any, any];
+                out.push({ block: b, kind: "ProposalFinalized", details: `#${id.toString()} → ${status.toString()}` });
+                return;
+              }
 
-            // Event::VaultSeeded { coin, amount }
-            if (method === "VaultSeeded") {
-              const [coin, amount] = event.data as unknown as [any, any];
-              out.push({ block: b, kind: "VaultSeeded", details: `${coin.toString()} +${amount.toString()}` });
-            }
-          });
+              // VaultSeeded(coin, amount) – global
+              if (evs?.template?.VaultSeeded?.is?.(ev)) {
+                const [coin, amount] = ev.data as unknown as [any, any];
+                out.push({ block: b, kind: "VaultSeeded", details: `${coin.toString()} +${formatBal(amount)}` });
+                return;
+              }
+
+              // Fallback ako se ime palete razlikuje (npr. "templateModule")
+              // if ((ev.section === "template" || ev.section === "templateModule") && ev.method === "Deposited") { ... }
+            });
+          } catch (e: any) {
+            // najverovatnije pruned state za taj blok → prekini skeniranje dalje unazad
+            console.warn("Skipped pruned block", b, e?.message);
+            break;
+          }
         }
 
-        // Sortiraj opadajuće po bloku, setuj state
         out.sort((a, b) => b.block - a.block);
         setRows(out);
         setLoading(false);
