@@ -275,5 +275,21 @@ pub mod pallet {
 			Self::deposit_event(Event::Deposited { who, amount });
 			Ok(())
 		}
+
+		#[pallet::call_index(4)]
+		#[pallet::weight(10_000)]
+		pub fn withdraw(origin: OriginFor<T>, amount: BalanceOf<T>) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			let staked = Deposits::<T>::get(&who);
+			ensure!(amount <= staked, Error::<T>::WithdrawTooLarge);
+
+			let _unreserved = T::Currency::unreserve(&who, amount);
+			Deposits::<T>::mutate(&who, |b| *b = b.saturating_sub(amount));
+			Self::deposit_event(Event::Withdrawn { who, amount });
+			Ok(())
+		}
+
+
+
 	}
 }
