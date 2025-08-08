@@ -44,10 +44,12 @@ export default function ProposalList() {
                         votes_for: value.forVotes ?? 0,
                         votes_against: value.againstVotes ?? 0,
                         duration: value.end - value.start,
-                        status: value.status
+                        status: value.status,
+                        start: value.start
                     };
                 })
             );
+            all.sort((a, b) => a.start - b.start);
             setProposals(all);
             setLoading(false);
         })();
