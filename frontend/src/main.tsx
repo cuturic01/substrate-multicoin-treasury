@@ -7,7 +7,8 @@ import theme from "./theme";
 import Navbar from "./components/navbar";
 import ProposalList from "./components/proposal-list";
 import CreateProposal from "./components/create-proposal";
-import ProposalDetails from "./components/Proposal";
+import ProposalDetails from "./components/proposal";
+import Profile from "./components/profile";
 
 const router = createBrowserRouter([
   {
@@ -17,6 +18,7 @@ const router = createBrowserRouter([
       { path: "/", element: <ProposalList /> },
       { path: "/create-proposal", element: <CreateProposal /> },
       { path: "/proposal/:id", element: <ProposalDetails /> },
+      { path: "/profile", element: <Profile /> },
     ],
   },
 ]);
