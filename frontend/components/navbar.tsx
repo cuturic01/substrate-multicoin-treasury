@@ -32,7 +32,7 @@ export default function Navbar() {
 
 	const navItems = [
 		{ label: "Deposit", icon: <CallMade />, path: "/deposit" },
-		{ label: "Proposal", icon: <RiContractFill />, path: "/" },
+		{ label: "Proposals", icon: <RiContractFill />, path: "/" },
 		{ label: "History", icon: <History />, path: "/history" },
 		{ label: "Profile", icon: <Person />, path: "/profile" },
 	];
