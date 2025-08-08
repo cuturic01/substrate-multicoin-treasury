@@ -6,8 +6,10 @@ import {
   Paper,
   Grid,
   Stack,
+  TextField,
   Tooltip,
   IconButton,
+  MenuItem,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useNavigate } from "react-router-dom";
@@ -40,6 +42,8 @@ export default function ProposalList() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const [authorFilter, setAuthorFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => {
     let api: ApiPromise;
@@ -80,6 +84,14 @@ export default function ProposalList() {
     toast.success("Copied!");
   };
 
+  const filteredProposals = proposals.filter((p) => {
+    const authorMatch = authorFilter
+      ? p.author.toLowerCase().includes(authorFilter.toLowerCase())
+      : true;
+    const statusMatch = statusFilter ? p.status === statusFilter : true;
+    return authorMatch && statusMatch;
+  });
+
   return (
     <Box sx={{ mx: "auto", mb: 4, width: "95%", pt: { xs: 7, sm: 8 } }}>
       <Stack
@@ -100,13 +112,38 @@ export default function ProposalList() {
           Create Proposal
         </Button>
       </Stack>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} mb={2}>
+        <TextField
+          label="Filter by Author"
+          value={authorFilter}
+          onChange={e => setAuthorFilter(e.target.value)}
+          size="small"
+          color="secondary"
+          sx={{ minWidth: 200 }}
+        />
+        <TextField
+          label="Filter by Status"
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          select
+          size="small"
+          color="secondary"
+          sx={{ minWidth: 200 }}
+        >
+          <MenuItem value="">All</MenuItem>
+          <MenuItem value="Active">Active</MenuItem>
+          <MenuItem value="Approved">Approved</MenuItem>
+          <MenuItem value="Rejected">Rejected</MenuItem>
+          <MenuItem value="Cancelled">Cancelled</MenuItem>
+        </TextField>
+      </Stack>
       {loading ? (
         <Typography>Loading...</Typography>
-      ) : proposals.length === 0 ? (
-        <Typography>No proposals yet.</Typography>
+      ) : filteredProposals.length === 0 ? (
+        <Typography>No proposals found.</Typography>
       ) : (
         <Grid container spacing={2}>
-          {proposals.map((p) => (
+          {filteredProposals.map((p) => (
             //@ts-ignore
             <Grid item xs={12} sm={6} md={4} key={p.id} sx={{ width: 350 }}>
               <Paper
@@ -132,7 +169,7 @@ export default function ProposalList() {
                   color="text.secondary"
                   sx={{ display: "flex", alignItems: "center", mt: 1 }}
                 >
-                  Creator:&nbsp;
+                  Author:&nbsp;
                   <span style={{ fontFamily: "monospace" }}>
                     {ellipsisAddress(p.author, 20)}
                   </span>
@@ -147,10 +184,10 @@ export default function ProposalList() {
                 </Typography>
 
                 <Typography variant="body2" color="text.secondary">
-                  Votes For: {p.votes_for} | Votes Against: {p.votes_against}
+                  Votes For: <span style={{ color: '#FF4AA6' }}>{p.votes_for}</span> | Votes Against: <span style={{ color: '#FF4AA6' }}>{p.votes_against}</span>
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Duration (in blocks): {p.duration}
+                  Duration (in blocks): <span style={{ color: '#FF4AA6' }}>{p.duration}</span>
                 </Typography>
                 <Typography variant="body2" color="#FF4AA6" sx={{ mt: 1 }}>
                   Status: {p.status}
