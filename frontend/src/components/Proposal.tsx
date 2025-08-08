@@ -10,6 +10,10 @@ import {
     Divider,
     Chip,
     Button,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useParams } from "react-router-dom";
@@ -37,8 +41,37 @@ export default function ProposalDetails() {
     const [loading, setLoading] = useState(true);
     const [currentBlock, setCurrentBlock] = useState<number | null>(null);
     const [data, setData] = useState<ProposalOnChain | null>(null);
+    const [voteKind, setVoteKind] = useState<"For" | "Against">("For");
+    const [voting, setVoting] = useState(false);
 
     const numericId = useMemo(() => Number(id), [id]);
+    const handleVote = async () => {
+        setVoting(true);
+        try {
+            await web3Enable("PolkaVault");
+            const accounts = await web3Accounts();
+            if (!accounts.length) throw new Error("No Polkadot.js accounts found!");
+            const account = accounts[0];
+            const injector = await web3FromAddress(account.address);
+            const api = await ApiPromise.create({ provider: new WsProvider(WS_URL) });
+            const voteIndex = voteKind === "For" ? 0 : 1;
+            const tx = api.tx.template.voteProposal(Number(id), voteIndex);
+            await tx.signAndSend(account.address, { signer: injector.signer }, ({ status, dispatchError }) => {
+                if (dispatchError) {
+                    toast.error("Transaction failed");
+                    setVoting(false);
+                }
+                if (status.isInBlock || status.isFinalized) {
+                    toast.success("Vote submitted!");
+                    setVoting(false);
+                    window.location.reload();
+                }
+            });
+        } catch (err: any) {
+            toast.error(err.message || "Error voting");
+            setVoting(false);
+        }
+    };
 
     useEffect(() => {
         let mounted = true;
@@ -135,40 +168,74 @@ export default function ProposalDetails() {
 
             <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3 }}>
                 <Stack spacing={2}>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+                    <Stack
+                        direction="row"
+                        alignItems="flex-start"
+                        justifyContent="space-between"
+                        mb={2}
+                    >
                         <Typography variant="h5" color="secondary">
                             {data.title}
                         </Typography>
-                        {data.status === "Active" && (
-                            <Button
-                                variant="contained"
-                                color="secondary"
-                                onClick={async () => {
-                                    try {
-                                        await web3Enable("PolkaVault");
-                                        const accounts = await web3Accounts();
-                                        if (!accounts.length) throw new Error("No Polkadot.js accounts found!");
-                                        const account = accounts[0];
-                                        const injector = await web3FromAddress(account.address);
-                                        const api = await ApiPromise.create({ provider: new WsProvider(WS_URL) });
-                                        const tx = api.tx.template.finalizeProposal(Number(id));
-                                        await tx.signAndSend(account.address, { signer: injector.signer }, ({ status, dispatchError }) => {
-                                            if (dispatchError) {
-                                                toast.error("Transaction failed");
-                                            }
-                                            if (status.isInBlock || status.isFinalized) {
-                                                toast.success("Proposal finalized!");
-                                                window.location.reload();
-                                            }
-                                        });
-                                    } catch (err: any) {
-                                        toast.error(err.message || "Error finalizing proposal");
-                                    }
-                                }}
-                            >
-                                Finalize
-                            </Button>
-                        )}
+
+                        <Stack spacing={1} alignItems="flex-end">
+                            {data.status === "Active" && (
+                                <Button
+                                    variant="contained"
+                                    color="secondary"
+                                    onClick={async () => {
+                                        try {
+                                            await web3Enable("PolkaVault");
+                                            const accounts = await web3Accounts();
+                                            if (!accounts.length) throw new Error("No Polkadot.js accounts found!");
+                                            const account = accounts[0];
+                                            const injector = await web3FromAddress(account.address);
+                                            const api = await ApiPromise.create({ provider: new WsProvider(WS_URL) });
+                                            const tx = api.tx.template.finalizeProposal(Number(id));
+                                            await tx.signAndSend(account.address, { signer: injector.signer }, ({ status, dispatchError }) => {
+                                                if (dispatchError) {
+                                                    toast.error("Transaction failed");
+                                                }
+                                                if (status.isInBlock || status.isFinalized) {
+                                                    toast.success("Proposal finalized!");
+                                                    window.location.reload();
+                                                }
+                                            });
+                                        } catch (err: any) {
+                                            toast.error(err.message || "Error finalizing proposal");
+                                        }
+                                    }}
+                                >
+                                    Finalize
+                                </Button>
+                            )}
+
+                            {data?.status === "Active" && (
+                                <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                                    <FormControl size="small" color="secondary">
+                                        <InputLabel id="vote-kind-label">Vote</InputLabel>
+                                        <Select
+                                            labelId="vote-kind-label"
+                                            value={voteKind}
+                                            label="Vote"
+                                            onChange={(e) => setVoteKind(e.target.value as "For" | "Against")}
+                                            sx={{ minWidth: 120 }}
+                                        >
+                                            <MenuItem value="For">For</MenuItem>
+                                            <MenuItem value="Against">Against</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        disabled={voting}
+                                        onClick={handleVote}
+                                    >
+                                        {voting ? "Voting..." : "Vote"}
+                                    </Button>
+                                </Box>
+                            )}
+                        </Stack>
                     </Stack>
 
                     <Typography variant="h6" color="#FF4AA6">
