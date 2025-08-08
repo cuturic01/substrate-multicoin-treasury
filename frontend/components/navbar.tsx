@@ -32,7 +32,7 @@ export default function Navbar() {
 
 	const navItems = [
 		{ label: "Deposit", icon: <CallMade />, path: "/deposit" },
-		{ label: "Proposal", icon: <RiContractFill />, path: "/propose" },
+		{ label: "Proposal", icon: <RiContractFill />, path: "/" },
 		{ label: "History", icon: <History />, path: "/history" },
 		{ label: "Profile", icon: <Person />, path: "/profile" },
 	];
@@ -57,7 +57,7 @@ export default function Navbar() {
 					}}
 				>
 					<Box
-						onClick={() => navigate("/home")}
+						onClick={() => navigate("/")}
 						sx={{
 							display: "flex",
 							alignItems: "center",
