@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Button, Paper, Stack, TextField, Typography } from "@mui/material";
+import { Box, Button, Paper, Stack, TextField, Typography, MenuItem } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { web3Enable, web3Accounts, web3FromAddress } from "@polkadot/extension-dapp";
 import { ApiPromise, WsProvider } from "@polkadot/api";
@@ -7,10 +7,16 @@ import toast from "react-hot-toast";
 
 const WS_URL = "ws://127.0.0.1:9944";
 
+const PROPOSAL_TYPES = [
+  { value: "SwapToETH", label: "Swap to ETH" },
+  { value: "SwapToBTC", label: "Swap to BTC" },
+];
+
 export default function CreateProposal() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [duration, setDuration] = useState<number | "">("");
+  const [proposalType, setProposalType] = useState(PROPOSAL_TYPES[0].value);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
@@ -27,7 +33,8 @@ export default function CreateProposal() {
       const injector = await web3FromAddress(account.address);
       const api = await ApiPromise.create({ provider: new WsProvider(WS_URL) });
 
-      const tx = api.tx.template.createProposal(title, description, duration);
+      // Add proposalType as argument if backend supports it!
+      const tx = api.tx.template.createProposal(title, description, duration, proposalType);
       await tx.signAndSend(
         account.address,
         { signer: injector.signer },
@@ -60,6 +67,21 @@ export default function CreateProposal() {
         </Typography>
         <form onSubmit={handleSubmit}>
           <Stack spacing={3}>
+            <TextField
+              select
+              label="Proposal Type"
+              value={proposalType}
+              onChange={e => setProposalType(e.target.value)}
+              required
+              variant="outlined"
+              color="secondary"
+            >
+              {PROPOSAL_TYPES.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField
               label="Title"
               value={title}
@@ -95,7 +117,7 @@ export default function CreateProposal() {
               }
               sx={{
                 "& input[type=number]": {
-                  MozAppearance: "textfield", // Firefox
+                  MozAppearance: "textfield",
                 },
                 "& input[type=number]::-webkit-outer-spin-button": {
                   WebkitAppearance: "none",
