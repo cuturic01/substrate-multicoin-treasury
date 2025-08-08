@@ -46,7 +46,7 @@ export default function Navbar() {
 				flexDirection: "column",
 			}}
 		>
-			<AppBar position="relative" sx={{ flex: "0 1 auto" }}>
+			<AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
 				<Toolbar
 					sx={{
 						minHeight: "64px",

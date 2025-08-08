@@ -4,14 +4,17 @@ import AddIcon from "@mui/icons-material/Add";
 import { useNavigate } from "react-router-dom";
 import { web3Enable } from "@polkadot/extension-dapp";
 import { ApiPromise, WsProvider } from "@polkadot/api";
+import { hexToString } from '@polkadot/util';
 
 type Proposal = {
     id: number;
-    creator: string;
+    author: string;
     title: string;
     description: string;
     votes_for: number;
     votes_against: number;
+    duration: number;
+    status: 'Active' | 'Approved' | 'Rejected' | 'Cancelled';
 };
 
 const WS_URL = "ws://127.0.0.1:9944";
@@ -35,12 +38,13 @@ export default function ProposalList() {
                     const value = data.toJSON() as any;
                     return {
                         id,
-                        creator: value.creator,
-                        title: value.title ? Buffer.from(value.title).toString("utf-8") : "",
-                        description: value.description ? Buffer.from(value.description).toString("utf-8") : "",
-                        votes_for: value.votes_for,
-                        votes_against: value.votes_against,
-                        duration: value.duration,
+                        author: value.author,
+                        title: hexToString(value.title),
+                        description: hexToString(value.description),
+                        votes_for: value.forVotes ?? 0,
+                        votes_against: value.againstVotes ?? 0,
+                        duration: value.end - value.start,
+                        status: value.status
                     };
                 })
             );
@@ -53,7 +57,7 @@ export default function ProposalList() {
     }, []);
 
     return (
-        <Box sx={{ maxWidth: 700, mx: "auto", mt: 4 }}>
+        <Box sx={{ maxWidth: 700, mx: "auto", mt: 4, mb: 4, width: "95%", pt: { xs: 7, sm: 8 } }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h4" color="secondary">Proposals</Typography>
                 <Button
@@ -75,10 +79,16 @@ export default function ProposalList() {
                         <Paper key={p.id} sx={{ p: 2 }}>
                             <Typography variant="h6" color="secondary">{p.title} - {p.description}</Typography>
                             <Typography variant="body2" color="text.secondary">
-                                Creator: {p.creator}
+                                Creator: {p.author}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
                                 Votes For: {p.votes_for} | Votes Against: {p.votes_against}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Duration (in blocks): {p.duration}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Status: {p.status}
                             </Typography>
                         </Paper>
                     ))}
