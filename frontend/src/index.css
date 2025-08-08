@@ -1,0 +1,28 @@
+#root {
+	margin: 0;
+	padding: 0;
+	width: 100vw;
+	height: 100vh;
+}
+
+:root {
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	-webkit-text-size-adjust: 100%;
+}
+
+body {
+	margin: 0;
+	min-width: 320px;
+	overflow-x: hidden;
+	width: 100vw;
+}
+
+h4 {
+	margin: 0;
+}
+
+#logo:hover {
+	cursor: pointer;
+}
