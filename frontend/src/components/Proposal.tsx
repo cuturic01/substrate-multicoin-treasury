@@ -168,6 +168,7 @@ export default function ProposalDetails() {
 
             <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3 }}>
                 <Stack spacing={2}>
+
                     <Stack
                         direction="row"
                         alignItems="flex-start"
@@ -182,7 +183,8 @@ export default function ProposalDetails() {
                             {data.status === "Active" && (
                                 <Button
                                     variant="contained"
-                                    color="secondary"
+                                    color="primary"
+                                    sx={{ minWidth: 120 }}
                                     onClick={async () => {
                                         try {
                                             await web3Enable("PolkaVault");
@@ -227,9 +229,10 @@ export default function ProposalDetails() {
                                     </FormControl>
                                     <Button
                                         variant="contained"
-                                        color="primary"
+                                        color="secondary"
                                         disabled={voting}
                                         onClick={handleVote}
+                                        sx={{ minWidth: 120 }}
                                     >
                                         {voting ? "Voting..." : "Vote"}
                                     </Button>
