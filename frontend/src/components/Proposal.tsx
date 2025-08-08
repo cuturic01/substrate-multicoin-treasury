@@ -180,37 +180,7 @@ export default function ProposalDetails() {
                         </Typography>
 
                         <Stack spacing={1} alignItems="flex-end">
-                            {data.status === "Active" && (
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    sx={{ minWidth: 120 }}
-                                    onClick={async () => {
-                                        try {
-                                            await web3Enable("PolkaVault");
-                                            const accounts = await web3Accounts();
-                                            if (!accounts.length) throw new Error("No Polkadot.js accounts found!");
-                                            const account = accounts[0];
-                                            const injector = await web3FromAddress(account.address);
-                                            const api = await ApiPromise.create({ provider: new WsProvider(WS_URL) });
-                                            const tx = api.tx.template.finalizeProposal(Number(id));
-                                            await tx.signAndSend(account.address, { signer: injector.signer }, ({ status, dispatchError }) => {
-                                                if (dispatchError) {
-                                                    toast.error("Transaction failed");
-                                                }
-                                                if (status.isInBlock || status.isFinalized) {
-                                                    toast.success("Proposal finalized!");
-                                                    window.location.reload();
-                                                }
-                                            });
-                                        } catch (err: any) {
-                                            toast.error(err.message || "Error finalizing proposal");
-                                        }
-                                    }}
-                                >
-                                    Finalize
-                                </Button>
-                            )}
+
 
                             {data?.status === "Active" && (
                                 <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
@@ -229,10 +199,9 @@ export default function ProposalDetails() {
                                     </FormControl>
                                     <Button
                                         variant="contained"
-                                        color="secondary"
+                                        sx={{ minWidth: 120, color: "#FFFFFF", backgroundColor: "#E6007A" }}
                                         disabled={voting}
                                         onClick={handleVote}
-                                        sx={{ minWidth: 120 }}
                                     >
                                         {voting ? "Voting..." : "Vote"}
                                     </Button>
@@ -311,6 +280,36 @@ export default function ProposalDetails() {
                             <Typography variant="h6">{currentBlock ?? "…"}</Typography>
                         </Paper>
                     </Stack>
+                    {data.status === "Active" && (
+                        <Button
+                            variant="contained"
+                            sx={{ minWidth: 120, color: "#FFFFFF", backgroundColor: "#E6007A" }}
+                            onClick={async () => {
+                                try {
+                                    await web3Enable("PolkaVault");
+                                    const accounts = await web3Accounts();
+                                    if (!accounts.length) throw new Error("No Polkadot.js accounts found!");
+                                    const account = accounts[0];
+                                    const injector = await web3FromAddress(account.address);
+                                    const api = await ApiPromise.create({ provider: new WsProvider(WS_URL) });
+                                    const tx = api.tx.template.finalizeProposal(Number(id));
+                                    await tx.signAndSend(account.address, { signer: injector.signer }, ({ status, dispatchError }) => {
+                                        if (dispatchError) {
+                                            toast.error("Transaction failed");
+                                        }
+                                        if (status.isInBlock || status.isFinalized) {
+                                            toast.success("Proposal finalized!");
+                                            window.location.reload();
+                                        }
+                                    });
+                                } catch (err: any) {
+                                    toast.error(err.message || "Error finalizing proposal");
+                                }
+                            }}
+                        >
+                            Finalize
+                        </Button>
+                    )}
                 </Stack>
             </Paper>
         </Box>
