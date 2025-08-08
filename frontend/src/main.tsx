@@ -4,9 +4,10 @@ import "./index.css";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import theme from "./theme";
-import Navbar from "../components/navbar";
-import ProposalList from "./components/Proposal";
-import CreateProposal from "./components/CreateProposal";
+import Navbar from "./components/navbar";
+import ProposalList from "./components/proposal-list";
+import CreateProposal from "./components/create-proposal";
+import ProposalDetails from "./components/Proposal";
 
 const router = createBrowserRouter([
   {
@@ -15,6 +16,7 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <ProposalList /> },
       { path: "/create-proposal", element: <CreateProposal /> },
+      { path: "/proposal/:id", element: <ProposalDetails /> },
     ],
   },
 ]);

@@ -1,134 +1,217 @@
-import { useEffect, useState } from "react";
-import { Box, Button, Typography, Paper, Grid, Stack, Tooltip, IconButton } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
-import { useNavigate } from "react-router-dom";
-import { web3Enable } from "@polkadot/extension-dapp";
-import { ApiPromise, WsProvider } from "@polkadot/api";
-import { hexToString } from '@polkadot/util';
+// src/pages/ProposalDetails.tsx
+import { useEffect, useMemo, useState } from "react";
+import {
+  Box,
+  Paper,
+  Stack,
+  Typography,
+  IconButton,
+  Tooltip,
+  Divider,
+  Chip,
+} from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import { useParams } from "react-router-dom";
+import { ApiPromise, WsProvider } from "@polkadot/api";
+import { web3Enable } from "@polkadot/extension-dapp";
+import { hexToString } from "@polkadot/util";
 import toast from "react-hot-toast";
 
-type Proposal = {
-    id: number;
-    author: string;
-    title: string;
-    description: string;
-    votes_for: number;
-    votes_against: number;
-    duration: number;
-    status: 'Active' | 'Approved' | 'Rejected' | 'Cancelled';
+type ProposalOnChain = {
+  author: string;
+  title: string;
+  description: string;
+  forVotes: number;
+  againstVotes: number;
+  start: number;
+  end: number;
+  status: "Active" | "Approved" | "Rejected" | "Cancelled";
 };
-
-function ellipsisAddress(addr: string, max = 15) {
-    if (!addr || addr.length <= max) return addr;
-    const half = Math.floor((max - 3) / 2);
-    return `${addr.slice(0, half)}...${addr.slice(-half)}`;
-}
 
 const WS_URL = "ws://127.0.0.1:9944";
 
-export default function ProposalList() {
-    const [proposals, setProposals] = useState<Proposal[]>([]);
-    const [loading, setLoading] = useState(true);
-    const navigate = useNavigate();
+export default function ProposalDetails() {
+  const { id } = useParams<{ id: string }>();
 
-    useEffect(() => {
-        let api: ApiPromise;
-        (async () => {
-            await web3Enable("PolkaVault");
-            api = await ApiPromise.create({ provider: new WsProvider(WS_URL) });
-            const keys = await api.query.template.proposals.keys();
-            const all = await Promise.all(
-                keys.map(async (k: any) => {
-                    const id = k.args[0].toNumber();
+  const [loading, setLoading] = useState(true);
+  const [currentBlock, setCurrentBlock] = useState<number | null>(null);
+  const [data, setData] = useState<ProposalOnChain | null>(null);
 
-                    const data = await api.query.template.proposals(id);
-                    const value = data.toJSON() as any;
-                    return {
-                        id,
-                        author: value.author,
-                        title: hexToString(value.title),
-                        description: hexToString(value.description),
-                        votes_for: value.forVotes ?? 0,
-                        votes_against: value.againstVotes ?? 0,
-                        duration: value.end - value.start,
-                        status: value.status,
-                        start: value.start
-                    };
-                })
-            );
-            all.sort((a, b) => a.start - b.start);
-            setProposals(all);
-            setLoading(false);
-        })();
+  const numericId = useMemo(() => Number(id), [id]);
+
+  useEffect(() => {
+    let mounted = true;
+    let _api: ApiPromise;
+
+    (async () => {
+      try {
+        await web3Enable("PolkaVault");
+        _api = await ApiPromise.create({ provider: new WsProvider(WS_URL) });
+        if (!mounted) return;
+
+        const raw = await _api.query.template.proposals(numericId);
+        const json = raw.toJSON() as any;
+
+        if (!json || !json.author) {
+          toast.error("Proposal not found");
+          setLoading(false);
+          return;
+        }
+
+        setData({
+          author: json.author,
+          title: hexToString(json.title),
+          description: hexToString(json.description),
+          forVotes: json.forVotes ?? 0,
+          againstVotes: json.againstVotes ?? 0,
+          start: json.start,
+          end: json.end,
+          status: json.status,
+        });
+
+        const unsub = await _api.rpc.chain.subscribeNewHeads((h) => {
+          setCurrentBlock(h.number.toNumber());
+        });
+
+        setLoading(false);
+
         return () => {
-            if (api) api.disconnect();
+          unsub && unsub();
         };
-    }, []);
+      } catch (e: any) {
+        toast.error(e?.message || "Failed to load proposal");
+        setLoading(false);
+      }
+    })();
 
-    const handleCopy = (address: string) => {
-        navigator.clipboard.writeText(address);
-        toast.success("Copied!");
+    return () => {
+      mounted = false;
+      if (_api) _api.disconnect().catch(() => undefined);
     };
+  }, [numericId]);
 
+  const blocksTotal = data ? data.end - data.start : null;
+  const blocksLeft =
+    data && currentBlock != null ? Math.max(0, data.end - currentBlock) : null;
+
+  const statusColor =
+    data?.status === "Active"
+      ? "warning"
+      : data?.status === "Approved"
+      ? "success"
+      : data?.status === "Rejected"
+      ? "error"
+      : "default";
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied!");
+  };
+
+  if (loading) {
     return (
-        <Box sx={{ mx: "auto", mt: 4, mb: 4, width: "95%", pt: { xs: 7, sm: 8 } }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h4" color="secondary">Proposals</Typography>
-                <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<AddIcon />}
-                    onClick={() => navigate("/create-proposal")}
-                >
-                    Create Proposal
-                </Button>
-            </Stack>
-            {loading ? (
-                <Typography>Loading...</Typography>
-            ) : proposals.length === 0 ? (
-                <Typography>No proposals yet.</Typography>
-            ) : (
-                <Grid container spacing={2}>
-                    {proposals.map((p) => (
-                        <Grid item xs={12} sm={6} md={4} key={p.id} sx={{ width: 350 }}>
-                            <Paper sx={{ p: 2 }}>
-                                <Typography variant="h5" color="#FF4AA6">
-                                    {p.title}
-                                </Typography>
-                                <Typography variant="h6" color="secondary" sx={{ mt: 1 }}>
-                                    {p.description}
-                                </Typography>
-                                <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{ display: "flex", alignItems: "center", mt: 1 }}
-                                >
-                                    Creator:&nbsp;
-                                    <span style={{ fontFamily: "monospace" }}>
-                                        {ellipsisAddress(p.author, 20)}
-                                    </span>
-                                    <Tooltip title="Copy address">
-                                        <IconButton size="small" onClick={() => handleCopy(p.author)}>
-                                            <ContentCopyIcon fontSize="inherit" />
-                                        </IconButton>
-                                    </Tooltip>
-                                </Typography>
-
-                                <Typography variant="body2" color="text.secondary">
-                                    Votes For: {p.votes_for} | Votes Against: {p.votes_against}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    Duration (in blocks): {p.duration}
-                                </Typography>
-                                <Typography variant="body2" color="#FF4AA6" sx={{ mt: 1 }}>
-                                    Status: {p.status}
-                                </Typography>
-                            </Paper>
-                        </Grid>
-                    ))}
-                </Grid>
-            )}
-        </Box>
+      <Box sx={{ maxWidth: 900, mx: "auto" }}>
+        <Typography>Loading...</Typography>
+      </Box>
     );
+  }
+
+  if (!data) {
+    return (
+      <Box sx={{ maxWidth: 900, mx: "auto" }}>
+        <Typography sx={{ mt: 2 }}>Proposal not found.</Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ maxWidth: 900, mx: "auto", mb: 6, mt: 2 }}>
+      <Stack direction="row" justifyContent="flex-end" mb={2}>
+        <Chip
+          label={`Status: ${data.status}`}
+          color={statusColor as any}
+          variant="outlined"
+        />
+      </Stack>
+
+      <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3 }}>
+        <Stack spacing={2}>
+          <Typography variant="h4" color="secondary">
+            {data.title}
+          </Typography>
+
+          <Typography variant="h6" color="#FF4AA6">
+            Description
+          </Typography>
+          <Typography variant="body1">{data.description}</Typography>
+
+          <Divider />
+
+          <Typography variant="h6" color="#FF4AA6">
+            Author
+          </Typography>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Typography variant="body1" sx={{ fontFamily: "monospace" }}>
+              {data.author}
+            </Typography>
+            <Tooltip title="Copy address">
+              <IconButton size="small" onClick={() => handleCopy(data.author)}>
+                <ContentCopyIcon fontSize="inherit" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+
+          <Divider />
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} flexWrap="wrap">
+            <Paper sx={{ p: 2, flex: 1, minWidth: 220 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Votes For
+              </Typography>
+              <Typography variant="h5" color="secondary">
+                {data.forVotes}
+              </Typography>
+            </Paper>
+            <Paper sx={{ p: 2, flex: 1, minWidth: 220 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Votes Against
+              </Typography>
+              <Typography variant="h5" color="secondary">
+                {data.againstVotes}
+              </Typography>
+            </Paper>
+            <Paper sx={{ p: 2, flex: 1, minWidth: 220 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Duration (blocks)
+              </Typography>
+              <Typography variant="h5" color="secondary">
+                {blocksTotal}
+              </Typography>
+            </Paper>
+          </Stack>
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} flexWrap="wrap">
+            <Paper sx={{ p: 2, flex: 1, minWidth: 220 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Start Block
+              </Typography>
+              <Typography variant="h6">{data.start}</Typography>
+            </Paper>
+            <Paper sx={{ p: 2, flex: 1, minWidth: 220 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                End Block
+              </Typography>
+              <Typography variant="h6">{data.end}</Typography>
+            </Paper>
+            <Paper sx={{ p: 2, flex: 1, minWidth: 220 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Current Block
+              </Typography>
+              <Typography variant="h6">{currentBlock ?? "…"}</Typography>
+            </Paper>
+          </Stack>
+        </Stack>
+      </Paper>
+    </Box>
+  );
 }
