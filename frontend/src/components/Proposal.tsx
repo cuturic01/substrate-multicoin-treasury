@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { Box, Button, Typography, Paper, Stack } from "@mui/material";
+import { Box, Button, Typography, Paper, Grid, Stack, Tooltip, IconButton } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useNavigate } from "react-router-dom";
 import { web3Enable } from "@polkadot/extension-dapp";
 import { ApiPromise, WsProvider } from "@polkadot/api";
 import { hexToString } from '@polkadot/util';
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import toast from "react-hot-toast";
 
 type Proposal = {
     id: number;
@@ -16,6 +18,12 @@ type Proposal = {
     duration: number;
     status: 'Active' | 'Approved' | 'Rejected' | 'Cancelled';
 };
+
+function ellipsisAddress(addr: string, max = 15) {
+    if (!addr || addr.length <= max) return addr;
+    const half = Math.floor((max - 3) / 2);
+    return `${addr.slice(0, half)}...${addr.slice(-half)}`;
+}
 
 const WS_URL = "ws://127.0.0.1:9944";
 
@@ -58,8 +66,13 @@ export default function ProposalList() {
         };
     }, []);
 
+    const handleCopy = (address: string) => {
+        navigator.clipboard.writeText(address);
+        toast.success("Copied!");
+    };
+
     return (
-        <Box sx={{ maxWidth: 700, mx: "auto", mt: 4, mb: 4, width: "95%", pt: { xs: 7, sm: 8 } }}>
+        <Box sx={{ mx: "auto", mt: 4, mb: 4, width: "95%", pt: { xs: 7, sm: 8 } }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h4" color="secondary">Proposals</Typography>
                 <Button
@@ -76,25 +89,45 @@ export default function ProposalList() {
             ) : proposals.length === 0 ? (
                 <Typography>No proposals yet.</Typography>
             ) : (
-                <Stack spacing={2}>
+                <Grid container spacing={2}>
                     {proposals.map((p) => (
-                        <Paper key={p.id} sx={{ p: 2 }}>
-                            <Typography variant="h6" color="secondary">{p.title} - {p.description}</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Creator: {p.author}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Votes For: {p.votes_for} | Votes Against: {p.votes_against}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Duration (in blocks): {p.duration}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Status: {p.status}
-                            </Typography>
-                        </Paper>
+                        <Grid item xs={12} sm={6} md={4} key={p.id} sx={{ width: 350 }}>
+                            <Paper sx={{ p: 2 }}>
+                                <Typography variant="h5" color="#FF4AA6">
+                                    {p.title}
+                                </Typography>
+                                <Typography variant="h6" color="secondary" sx={{ mt: 1 }}>
+                                    {p.description}
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{ display: "flex", alignItems: "center", mt: 1 }}
+                                >
+                                    Creator:&nbsp;
+                                    <span style={{ fontFamily: "monospace" }}>
+                                        {ellipsisAddress(p.author, 20)}
+                                    </span>
+                                    <Tooltip title="Copy address">
+                                        <IconButton size="small" onClick={() => handleCopy(p.author)}>
+                                            <ContentCopyIcon fontSize="inherit" />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Typography>
+
+                                <Typography variant="body2" color="text.secondary">
+                                    Votes For: {p.votes_for} | Votes Against: {p.votes_against}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Duration (in blocks): {p.duration}
+                                </Typography>
+                                <Typography variant="body2" color="#FF4AA6" sx={{ mt: 1 }}>
+                                    Status: {p.status}
+                                </Typography>
+                            </Paper>
+                        </Grid>
                     ))}
-                </Stack>
+                </Grid>
             )}
         </Box>
     );
