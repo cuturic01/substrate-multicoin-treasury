@@ -20,9 +20,13 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use frame_support::{BoundedVec, pallet_prelude::*};
 	use frame_system::pallet_prelude::BlockNumberFor;
-	use frame_support::sp_runtime::Saturating;
+	use frame_support::sp_runtime::{Saturating};
+	use frame_support::traits::{ReservableCurrency, Currency};
 
 	pub type ProposalId = u32;
+	pub type BalanceOf<T> =
+    	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+
 
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen,DecodeWithMemTracking)]
 	pub enum ProposalStatus {
@@ -63,10 +67,13 @@ pub mod pallet {
 	pub trait Config: frame_system::Config {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		type WeightInfo: WeightInfo;
+		
 		type MaxTitleLen: Get<u32>;
 		type MaxDescriptionLen: Get<u32>;
 		type MinProposalDuration: Get<u32>;
 		type MaxProposalDuration: Get<u32>;
+		
+		type Currency: ReservableCurrency<Self::AccountId>;
 	}
 
 	#[pallet::storage]
@@ -82,6 +89,11 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn next_proposal_id)]
 	pub type NextProposalId<T> = StorageValue<_, ProposalId, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn deposits)]
+	pub type Deposits<T: Config> =
+    StorageMap<_, Blake2_128Concat, T::AccountId, BalanceOf<T>, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn has_voted)]
@@ -109,6 +121,14 @@ pub mod pallet {
 			id: ProposalId,
 			status: ProposalStatus,
 		},
+		Deposited { 
+			who: T::AccountId, 
+			amount: BalanceOf<T> 
+		},
+		Withdrawn { 
+			who: T::AccountId, 
+			amount: BalanceOf<T> 
+		},
 	}	
 
 	#[pallet::error]
@@ -121,6 +141,8 @@ pub mod pallet {
 		ProposalNotActive,
 		VotingPeriodEnded,
 		AlreadyVoted,
+		NoDeposit,            
+		WithdrawTooLarge,
 	}
 
 	#[pallet::call]
@@ -181,14 +203,11 @@ pub mod pallet {
 			Proposals::<T>::try_mutate(proposal_id, |maybe_proposal| -> Result<(), Error<T>> {
 				let proposal = maybe_proposal.as_mut().ok_or(Error::<T>::ProposalNotFound)?;
 
-				// Must be active
 				ensure!(proposal.status == ProposalStatus::Active, Error::<T>::ProposalNotActive);
 
-				// Must be within voting period
 				let now: BlockNumberFor<T> = <frame_system::Pallet<T>>::block_number();
 				ensure!(now <= proposal.end, Error::<T>::VotingPeriodEnded);
 
-				// Prevent double voting
 				ensure!(
 					!HasVoted::<T>::get(proposal_id, &who),
 					Error::<T>::AlreadyVoted
@@ -245,6 +264,16 @@ pub mod pallet {
 
 			Ok(())
 
+		}
+
+		#[pallet::call_index(3)]
+		#[pallet::weight(10_000)]
+		pub fn deposit(origin: OriginFor<T>, amount: BalanceOf<T>) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			T::Currency::reserve(&who, amount)?;
+			Deposits::<T>::mutate(&who, |b| *b = b.saturating_add(amount));
+			Self::deposit_event(Event::Deposited { who, amount });
+			Ok(())
 		}
 	}
 }

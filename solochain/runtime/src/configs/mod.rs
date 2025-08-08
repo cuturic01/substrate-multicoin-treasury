@@ -164,13 +164,18 @@ parameter_types! {
 
     pub const MinProposalDuration: u32 = 10;
     pub const MaxProposalDuration: u32 = 10_000;
+
 }
 
 impl pallet_template::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type WeightInfo = (); 
+	
     type MaxTitleLen = MaxTitleLen;
     type MaxDescriptionLen = MaxDescriptionLen;
     type MinProposalDuration = MinProposalDuration;
     type MaxProposalDuration = MaxProposalDuration;
+
+	type Currency = Balances;
+
 }
