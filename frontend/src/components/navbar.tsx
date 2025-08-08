@@ -18,6 +18,10 @@ import { CallMade, Menu, Person } from "@mui/icons-material";
 import { RiContractFill } from "react-icons/ri";
 import { useState } from "react";
 import StakeDialog from "./stake-pop-up";
+import { web3Accounts, web3Enable, web3FromAddress } from "@polkadot/extension-dapp";
+import { ApiPromise, WsProvider } from "@polkadot/api";
+import toast from "react-hot-toast";
+const WS_URL = "ws://127.0.0.1:9944";
 
 export default function Navbar() {
 	const navigate = useNavigate();
@@ -28,13 +32,13 @@ export default function Navbar() {
 	const [stakeOpen, setStakeOpen] = useState(false);
 
 	const navItems = [
-		{ label: "Deposit", icon: <CallMade />, path: "/deposit", type: "action" as const },
+		{ label: "Stake", icon: <CallMade />, path: "/stake", type: "action" as const },
 		{ label: "Proposals", icon: <RiContractFill />, path: "/", type: "route" as const },
 		{ label: "Profile", icon: <Person />, path: "/profile", type: "route" as const },
 	];
 
 	const handleNavClick = (item: (typeof navItems)[number]) => {
-		if (item.type === "action" && item.label === "Deposit") {
+		if (item.type === "action" && item.label === "Stake") {
 			setStakeOpen(true);
 		} else {
 			navigate(item.path);
@@ -131,10 +135,35 @@ export default function Navbar() {
 			<StakeDialog
 				open={stakeOpen}
 				onClose={() => setStakeOpen(false)}
-				onConfirm={(amount) => {
-					console.log("Stake amount:", amount);
+				onConfirm={async (amount) => {
+					try {
+						await web3Enable("PolkaVault");
+						const accounts = await web3Accounts();
+						if (!accounts.length) throw new Error("No Polkadot.js accounts found!");
+
+						const account = accounts[0];
+						const injector = await web3FromAddress(account.address);
+						const api = await ApiPromise.create({ provider: new WsProvider(WS_URL) });
+
+						const tx = api.tx.template.deposit(amount);
+						await tx.signAndSend(
+							account.address,
+							{ signer: injector.signer },
+							({ status, dispatchError }) => {
+								if (dispatchError) {
+									toast.error("Transaction failed");
+								}
+								if (status.isInBlock || status.isFinalized) {
+									toast.success("Stake deposited!");
+								}
+							}
+						);
+					} catch (err: any) {
+						toast.error(err.message || "Error creating stake");
+					}
 					setStakeOpen(false);
 				}}
+
 				title="Stake amount"
 			/>
 

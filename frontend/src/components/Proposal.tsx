@@ -22,6 +22,12 @@ import { web3Accounts, web3Enable, web3FromAddress } from "@polkadot/extension-d
 import { hexToString } from "@polkadot/util";
 import toast from "react-hot-toast";
 
+type Swap = {
+    from: string;
+    to: string;
+    amount: number;
+};
+
 type ProposalOnChain = {
     author: string;
     title: string;
@@ -31,6 +37,7 @@ type ProposalOnChain = {
     start: number;
     end: number;
     status: "Active" | "Approved" | "Rejected" | "Cancelled";
+    swap: Swap | null;
 };
 
 const WS_URL = "ws://127.0.0.1:9944";
@@ -101,6 +108,7 @@ export default function ProposalDetails() {
                     start: json.start,
                     end: json.end,
                     status: json.status,
+                    swap: json.action.swap
                 });
 
                 const unsub = await _api.rpc.chain.subscribeNewHeads((h) => {
@@ -216,7 +224,14 @@ export default function ProposalDetails() {
                     <Typography variant="body1">{data.description}</Typography>
 
                     <Divider />
-
+                    {data.swap && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            Swap {data.swap.amount} from{" "}
+                            <strong>{data.swap.from}</strong> to{" "}
+                            <strong>{data.swap.to}</strong>
+                        </Typography>
+                    )}
+                    < Divider />
                     <Typography variant="h6" color="#FF4AA6">
                         Author
                     </Typography>
