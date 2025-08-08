@@ -32,7 +32,7 @@ pub mod pallet {
 		Cancelled,
 	}
 
-	#[derive(Encode, Decode, Clone, Copy, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	#[derive(Encode, Decode, Clone, Copy, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen,DecodeWithMemTracking)]
 	pub enum VoteKind {
 		For,
 		Against,
@@ -174,7 +174,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			Proposals::<T>::try_mutate(proposal_id, |maybe_proposal| {
+			Proposals::<T>::try_mutate(proposal_id, |maybe_proposal| -> Result<(), Error<T>> {
 				let proposal = maybe_proposal.as_mut().ok_or(Error::<T>::ProposalNotFound)?;
 
 				// Must be active
