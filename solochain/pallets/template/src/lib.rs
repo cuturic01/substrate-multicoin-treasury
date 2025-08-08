@@ -20,8 +20,9 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use frame_support::{BoundedVec, pallet_prelude::*};
 	use frame_system::pallet_prelude::BlockNumberFor;
-	use frame_support::sp_runtime::{Saturating};
+	use frame_support::sp_runtime::{Saturating, Permill};
 	use frame_support::traits::{ReservableCurrency, Currency};
+
 
 	pub type ProposalId = u32;
 	pub type BalanceOf<T> =
@@ -48,6 +49,7 @@ pub mod pallet {
 	pub struct Proposal<T:Config>
 	where
 		T::AccountId: MaxEncodedLen,
+		BalanceOf<T>: MaxEncodedLen,
 	{
 		pub id: ProposalId,
 		pub author: T::AccountId,
@@ -55,8 +57,8 @@ pub mod pallet {
 		pub description: BoundedVec<u8, T::MaxDescriptionLen>, 
 		pub start: BlockNumberFor<T>,
 		pub end: BlockNumberFor<T>,                        
-		pub for_votes: u32,
-		pub against_votes: u32,
+		pub for_votes: BalanceOf<T>,
+    	pub against_votes: BalanceOf<T>,
 		pub status: ProposalStatus,
 	}
 
@@ -74,6 +76,9 @@ pub mod pallet {
 		type MaxProposalDuration: Get<u32>;
 		
 		type Currency: ReservableCurrency<Self::AccountId>;
+
+		type Quorum: Get<Permill>;
+		type ApprovalOfQuorum: Get<Permill>;
 	}
 
 	#[pallet::storage]
@@ -104,6 +109,9 @@ pub mod pallet {
 		bool,
 		ValueQuery
 	>;
+	#[pallet::storage]
+	#[pallet::getter(fn total_stake)]
+	pub type TotalStake<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -143,6 +151,7 @@ pub mod pallet {
 		AlreadyVoted,
 		NoDeposit,            
 		WithdrawTooLarge,
+		QuorumNotMet
 	}
 
 	#[pallet::call]
@@ -179,8 +188,8 @@ pub mod pallet {
 				description: desc_b,
 				start: now,
 				end,
-				for_votes: 0,
-				against_votes: 0,
+				for_votes: Zero::zero(),
+				against_votes: Zero::zero(),
 				status: ProposalStatus::Active,
 			};
 
@@ -213,9 +222,17 @@ pub mod pallet {
 					Error::<T>::AlreadyVoted
 				);
 
+				let weight = Deposits::<T>::get(&who);
+				ensure!(!weight.is_zero(), Error::<T>::NoDeposit);
+
 				match vote {
-					VoteKind::For => proposal.for_votes = proposal.for_votes.saturating_add(1),
-					VoteKind::Against => proposal.against_votes = proposal.against_votes.saturating_add(1),
+					VoteKind::For => proposal.for_votes = proposal.for_votes.saturating_add(weight),
+					VoteKind::Against => proposal.against_votes = proposal.against_votes.saturating_add(weight),
+				}
+
+				match vote {
+					VoteKind::For => proposal.for_votes = proposal.for_votes.saturating_add(One::one()),
+					VoteKind::Against => proposal.against_votes = proposal.against_votes.saturating_add(One::one()),
 				}
 
 				HasVoted::<T>::insert(proposal_id, &who, true);
@@ -246,25 +263,32 @@ pub mod pallet {
 				ensure!(proposal.status == ProposalStatus::Active, Error::<T>::ProposalNotActive);
 
 				let now: BlockNumberFor<T> = <frame_system::Pallet<T>>::block_number();
-				ensure!(now > proposal.end, Error::<T>::VotingPeriodEnded);
+				ensure!(now < proposal.end, Error::<T>::VotingPeriodEnded);
 
-				if proposal.for_votes > proposal.against_votes {
-					proposal.status = ProposalStatus::Approved;
+				let total = TotalStake::<T>::get();
+				let participation = proposal.for_votes.saturating_add(proposal.against_votes);
+
+				let min_participation = T::Quorum::get().mul_floor(total);
+				ensure!(participation >= min_participation, Error::<T>::QuorumNotMet);
+
+				let needed_for = T::ApprovalOfQuorum::get().mul_floor(participation);
+
+				proposal.status = if proposal.for_votes >= needed_for {
+					ProposalStatus::Approved
 				} else {
-					proposal.status = ProposalStatus::Rejected;
-				}
-
-				Self::deposit_event(Event::<T>::ProposalFinalized {
-					id: proposal_id,
-					status: proposal.status.clone(),
-				});
+					ProposalStatus::Rejected
+				};
 
 				Ok(())
 			})?;
 
-			Ok(())
+			Self::deposit_event(Event::<T>::ProposalFinalized {
+				id: proposal_id,
+				status: Proposals::<T>::get(proposal_id).unwrap().status,
+			});
 
-		}
+			Ok(())
+}
 
 		#[pallet::call_index(3)]
 		#[pallet::weight(10_000)]
@@ -272,6 +296,7 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			T::Currency::reserve(&who, amount)?;
 			Deposits::<T>::mutate(&who, |b| *b = b.saturating_add(amount));
+			TotalStake::<T>::mutate(|t| *t = t.saturating_add(amount));
 			Self::deposit_event(Event::Deposited { who, amount });
 			Ok(())
 		}
@@ -285,6 +310,7 @@ pub mod pallet {
 
 			let _unreserved = T::Currency::unreserve(&who, amount);
 			Deposits::<T>::mutate(&who, |b| *b = b.saturating_sub(amount));
+			TotalStake::<T>::mutate(|t| *t = t.saturating_sub(amount));
 			Self::deposit_event(Event::Withdrawn { who, amount });
 			Ok(())
 		}

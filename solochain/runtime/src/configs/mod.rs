@@ -36,7 +36,7 @@ use frame_system::pallet_prelude::BlockNumberFor; // (može zatrebati u drugim d
 use frame_system::limits::{BlockLength, BlockWeights};
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter, Multiplier};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-use sp_runtime::{traits::One, Perbill};
+use sp_runtime::{traits::One, Perbill, Permill};
 use sp_version::RuntimeVersion;
 
 // Local module imports
@@ -165,17 +165,21 @@ parameter_types! {
     pub const MinProposalDuration: u32 = 10;
     pub const MaxProposalDuration: u32 = 10_000;
 
+	pub const DaoQuorum: Permill = Permill::from_parts(666_666_666); // ~2/3
+    pub const DaoApprovalOfQuorum: Permill = Permill::from_percent(50); // 1/2
+
 }
 
 impl pallet_template::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type WeightInfo = (); 
-	
+
     type MaxTitleLen = MaxTitleLen;
     type MaxDescriptionLen = MaxDescriptionLen;
     type MinProposalDuration = MinProposalDuration;
     type MaxProposalDuration = MaxProposalDuration;
 
 	type Currency = Balances;
-
+    type Quorum = DaoQuorum;
+    type ApprovalOfQuorum = DaoApprovalOfQuorum;
 }
