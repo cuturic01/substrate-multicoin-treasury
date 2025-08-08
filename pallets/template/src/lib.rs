@@ -73,15 +73,25 @@ pub mod pallet {
 	#[pallet::getter(fn proposals)]
 	pub type Proposals<T: Config> = StorageMap<
 		_,
-		Blake2_128Concat,    // hasher za ključ
-		ProposalId,          // tip ključa
-		Proposal<T>,         // tip vrednosti (struct Proposal<T>)
-		OptionQuery          // vrednost se vraća kao Option<Proposal<T>>
+		Blake2_128Concat,
+		ProposalId,
+		Proposal<T>,
+		OptionQuery
 	>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn next_proposal_id)]
 	pub type NextProposalId<T> = StorageValue<_, ProposalId, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn has_voted)]
+	pub type HasVoted<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat, ProposalId,
+		Blake2_128Concat, T::AccountId,
+		bool,
+		ValueQuery
+	>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -90,6 +100,11 @@ pub mod pallet {
 			id: ProposalId,
 			author: T::AccountId,
     	},
+		ProposalVoted {
+			id: ProposalId,
+			voter: T::AccountId,
+			vote: VoteKind,
+    	},
 	}
 
 	#[pallet::error]
@@ -97,7 +112,11 @@ pub mod pallet {
 		NoneValue,
 		StorageOverflow,
 		DurationTooShort,
-    	DurationTooLong,
+		DurationTooLong,
+		ProposalNotFound,
+		ProposalNotActive,
+		VotingPeriodEnded,
+		AlreadyVoted,
 	}
 
 	#[pallet::call]
@@ -127,7 +146,6 @@ pub mod pallet {
 			let duration_bn: BlockNumberFor<T> = duration.into();
 			let end = now.saturating_add(duration_bn);
 
-			// Napravi strukturu direktno
 			let proposal = Proposal::<T> {
 				id,
 				author: who.clone(),
@@ -144,10 +162,51 @@ pub mod pallet {
 			NextProposalId::<T>::put(id.checked_add(1).ok_or(Error::<T>::StorageOverflow)?);
 
 			Self::deposit_event(Event::<T>::ProposalCreated { id, author: who });
+			Ok(())
+		}
+		
+		#[pallet::call_index(1)]
+		#[pallet::weight(10_000)]
+		pub fn vote_proposal(
+			origin: OriginFor<T>,
+			proposal_id: ProposalId,
+			vote: VoteKind,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+
+			Proposals::<T>::try_mutate(proposal_id, |maybe_proposal| {
+				let proposal = maybe_proposal.as_mut().ok_or(Error::<T>::ProposalNotFound)?;
+
+				// Must be active
+				ensure!(proposal.status == ProposalStatus::Active, Error::<T>::ProposalNotActive);
+
+				// Must be within voting period
+				let now: BlockNumberFor<T> = <frame_system::Pallet<T>>::block_number();
+				ensure!(now <= proposal.end, Error::<T>::VotingPeriodEnded);
+
+				// Prevent double voting
+				ensure!(
+					!HasVoted::<T>::get(proposal_id, &who),
+					Error::<T>::AlreadyVoted
+				);
+
+				match vote {
+					VoteKind::For => proposal.for_votes = proposal.for_votes.saturating_add(1),
+					VoteKind::Against => proposal.against_votes = proposal.against_votes.saturating_add(1),
+				}
+
+				HasVoted::<T>::insert(proposal_id, &who, true);
+
+				Ok(())
+			})?;
+
+			Self::deposit_event(Event::<T>::ProposalVoted {
+				id: proposal_id,
+				voter: who,
+				vote,
+			});
 
 			Ok(())
 		}
-
-
 	}
 }
