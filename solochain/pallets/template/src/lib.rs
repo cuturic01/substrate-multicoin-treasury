@@ -43,6 +43,26 @@ pub mod pallet {
 		Against,
 	}
 
+	#[derive(Encode, Decode, Clone, Copy, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen, DecodeWithMemTracking)]
+	pub enum Coin {
+		Dot,
+		Kusama,
+		Usdc,
+		Centrifuge,
+	}
+
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen, DecodeWithMemTracking)]
+	pub struct Swap {
+		pub from: Coin,
+		pub to: Coin,
+		pub amount: u128,
+	}
+
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen, DecodeWithMemTracking)]
+	pub enum Action {
+		Swap(Swap),
+	}
+
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
 	#[codec(mel_bound())]
@@ -60,6 +80,7 @@ pub mod pallet {
 		pub for_votes: BalanceOf<T>,
     	pub against_votes: BalanceOf<T>,
 		pub status: ProposalStatus,
+		pub action: Action,
 	}
 
 	#[pallet::pallet]
@@ -120,6 +141,10 @@ pub mod pallet {
 	pub type Karma<T: Config> =
     	StorageMap<_, Blake2_128Concat, T::AccountId, u32, ValueQuery>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn vault)]
+	pub type Vault<T> = StorageMap<_, Blake2_128Concat, Coin, u128, ValueQuery>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -144,6 +169,16 @@ pub mod pallet {
 			who: T::AccountId, 
 			amount: BalanceOf<T> 
 		},
+		SwapExecuted { 
+			from: Coin, 
+			to: Coin, 
+			amount: u128, 
+			proposal_id: ProposalId 
+		},
+    	VaultSeeded { 
+			coin: Coin, 
+			amount: u128 
+		},
 	}	
 
 	#[pallet::error]
@@ -158,7 +193,9 @@ pub mod pallet {
 		AlreadyVoted,
 		NoDeposit,            
 		WithdrawTooLarge,
-		QuorumNotMet
+		QuorumNotMet,
+		InsufficientVaultBalance,
+    	InvalidSwap,
 	}
 
 	#[pallet::call]
@@ -171,6 +208,7 @@ pub mod pallet {
 			title: BoundedVec<u8, T::MaxTitleLen>,
 			description: BoundedVec<u8, T::MaxDescriptionLen>,
 			duration: u32,
+			action: Action,
 		) -> DispatchResult {
 
 			let who = ensure_signed(origin)?;
@@ -198,6 +236,7 @@ pub mod pallet {
 				for_votes: Zero::zero(),
 				against_votes: Zero::zero(),
 				status: ProposalStatus::Active,
+				action
 			};
 
 			Proposals::<T>::insert(id, proposal);
@@ -288,6 +327,21 @@ pub mod pallet {
 				proposal.status = if proposal.for_votes >= needed_for {
 					proposal.status = ProposalStatus::Approved;
 
+					 match &proposal.action {
+						Action::Swap(Swap { from, to, amount }) => {
+							ensure!(from != to, Error::<T>::InvalidSwap);
+							let from_bal = Vault::<T>::get(*from);
+							ensure!(from_bal >= *amount, Error::<T>::InsufficientVaultBalance);
+
+							Vault::<T>::insert(*from, from_bal - *amount);
+							Vault::<T>::mutate(*to, |b| *b = b.saturating_add(*amount));
+
+							Self::deposit_event(Event::<T>::SwapExecuted {
+								from: *from, to: *to, amount: *amount, proposal_id
+							});
+						}
+					}
+
 					let author = proposal.author.clone();
 					Karma::<T>::mutate(&author, |k| *k = k.saturating_add(1));
 					ProposalStatus::Approved
@@ -331,7 +385,13 @@ pub mod pallet {
 			Ok(())
 		}
 
-
+		#[pallet::call_index(5)]
+		#[pallet::weight(10_000)]
+		pub fn seed_vault(origin: OriginFor<T>, coin: Coin, amount: u128) -> DispatchResult {
+			Vault::<T>::mutate(coin, |b| *b = b.saturating_add(amount));
+			Self::deposit_event(Event::VaultSeeded { coin, amount });
+			Ok(())
+		}
 
 	}
 }
