@@ -33,14 +33,14 @@ import {
 	const [stakeOpen, setStakeOpen] = useState(false);
   
 	const navItems = [
-	  { label: "Stake", icon: <CallMade />, path: "/stake", type: "action" as const },
+	  { label: "Deposit", icon: <CallMade />, path: "/deposit", type: "action" as const },
 	  { label: "Portfolio", icon: <AccountBalanceWallet />, path: "/portfolio", type: "route" as const },
 	  { label: "Proposals", icon: <RiContractFill />, path: "/", type: "route" as const },
 	  { label: "Profile", icon: <Person />, path: "/profile", type: "route" as const },
 	];
   
 	const handleNavClick = (item: (typeof navItems)[number]) => {
-	  if (item.type === "action" && item.label === "Stake") {
+	  if (item.type === "action" && item.label === "Deposit") {
 		setStakeOpen(true);
 	  } else {
 		navigate(item.path);
@@ -168,7 +168,7 @@ import {
 			}
 			setStakeOpen(false);
 		  }}
-		  title="Stake amount"
+		  title="Deposit amount"
 		/>
   
 		<div id="detail" style={{ flex: "1 1 auto", width: "100%" }}>

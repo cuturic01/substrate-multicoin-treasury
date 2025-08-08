@@ -1,5 +1,3 @@
-// src/components/StakeDialog.tsx
-import React from "react";
 import {
     Dialog,
     DialogTitle,
@@ -33,7 +31,7 @@ export default function StakeDialog({
     onClose,
     onConfirm,
     initialAmount = 0,
-    title = "Stake amount",
+    title = "Deposit amount",
 }: StakeDialogProps) {
     return (
         <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
@@ -105,7 +103,7 @@ export default function StakeDialog({
                                     disabled={!isValid || isSubmitting}
                                     sx={{
                                         flex: 1,
-                                        backgroundColor: "#FF4AA6", // roze confirm
+                                        backgroundColor: "#FF4AA6",
                                         "&:hover": { backgroundColor: "#E6007A" },
                                     }}
                                 >
