@@ -1,5 +1,5 @@
 # Treasury Multicoin – Substrate-based Investment & Token Swap DAO
-
+![PolkaVault](./PolkaVault.png)
 ## Overview
 
 **Treasury Multicoin** is a **Substrate-based treasury system** running on a **Solochain** that enables decentralized proposals for investments and token swaps.
