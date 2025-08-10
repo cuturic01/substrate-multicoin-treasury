@@ -108,8 +108,8 @@ Open your browser at **[http://localhost:5173](http://localhost:5173)**.
 
 ## 👥 Authors
 
-* **\Branislav Stojkovic**
-* **\Milos Cuturic**
-* **\Nebojsa Vuga**
+* **Branislav Stojkovic**
+* **Milos Cuturic**
+* **Nebojsa Vuga**
 
 ---
